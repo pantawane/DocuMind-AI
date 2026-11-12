@@ -1,6 +1,7 @@
 import time
-from pinecone import Pinecone , ServerlessSpec
-from langchain_openai import OpenAIEmbeddings
+from pinecone import Pinecone, ServerlessSpec
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from app.core.config import get_settings
 
@@ -9,15 +10,13 @@ settings = get_settings()
 
 _embeddings = None
 _vectorstore = None
+_llm = None
 
 
 EMBEDDING_DIMENSIONS = {
-    "text-embedding-3-small": 1536,
-    "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536,
+    "sentence-transformers/all-minilm-l6-v2": 384,
     "all-minilm-l6-v2": 384,
 }
-
 
 
 def get_embedding_dimension(model_name: str | None = None) -> int:
@@ -28,34 +27,37 @@ def get_embedding_dimension(model_name: str | None = None) -> int:
     normalized = name.lower()
     if normalized in EMBEDDING_DIMENSIONS:
         return EMBEDDING_DIMENSIONS[normalized]
-    if "text-embedding-3-small" in normalized:
-        return 1536
-    if "text-embedding-3-large" in normalized:
-        return 3072
-    if "text-embedding-ada-002" in normalized:
-        return 1536
-    if "all-minilm" in normalized:
+    if "all-minilm-l6-v2" in normalized:
         return 384
 
     raise ValueError(
-        f"Unsupported embedding model '{model_name or settings.embedding_model}' for Pinecone. "
+        f"Unsupported embedding model '{name}' for Pinecone. "
         "Add the matching dimension to EMBEDDING_DIMENSIONS."
     )
-
 
 
 def get_embeddings():
     global _embeddings
     if _embeddings is None:
-        if not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is missing")
-        _embeddings = OpenAIEmbeddings(
-            model=settings.embedding_model,
-            api_key=settings.openai_api_key,
+        if not settings.embedding_model:
+            raise RuntimeError("EMBEDDING_MODEL is missing")
+        _embeddings = HuggingFaceEmbeddings(
+            model_name=settings.embedding_model,  # sentence-transformers/all-MiniLM-L6-v2
+            encode_kwargs={"normalize_embeddings": True},
         )
     return _embeddings
 
 
+def get_llm():
+    global _llm
+    if _llm is None:
+        if not settings.groq_api_key:
+            raise RuntimeError("GROQ_API_KEY is missing")
+        _llm = ChatGroq(
+            model=settings.groq_model,  # openai/gpt-oss-20b
+            api_key=settings.groq_api_key,
+        )
+    return _llm
 
 
 def ensure_index():
@@ -90,9 +92,6 @@ def ensure_index():
     return pc.Index(settings.pinecone_index_name)
 
 
-
-
-
 def get_vectorstore():
     global _vectorstore
     if _vectorstore is None:
@@ -105,10 +104,8 @@ def get_vectorstore():
     return _vectorstore
 
 
-
 def get_retriever():
     return get_vectorstore().as_retriever(search_kwargs={"k": settings.top_k})
-
 
 
 def add_documents(chunks):
