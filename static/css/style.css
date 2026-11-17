@@ -173,6 +173,21 @@ body {
   color: #8bc4ff;
   text-decoration: none;
 }
+.citation-item {
+  margin-top: 10px;
+  padding-left: 10px;
+  border-left: 2px solid #38516c;
+}
+.citation-location {
+  display: block;
+  margin-top: 2px;
+  color: #8c98a8;
+}
+.citation-excerpt {
+  display: block;
+  margin-top: 4px;
+  color: #c1cad5;
+}
 .composer-wrap {
   padding: 0 7% 30px;
 }

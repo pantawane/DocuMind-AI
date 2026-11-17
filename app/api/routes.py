@@ -41,15 +41,27 @@ def chat(payload: ChatRequest):
 
 @router.post("/ingest")
 async def ingest(file: UploadFile = File(...), x_admin_key: str = Header(default="")):
+    if not settings.admin_api_key:
+        raise HTTPException(status_code=503, detail="Document upload is not configured")
     if x_admin_key != settings.admin_api_key:
         raise HTTPException(status_code=401, detail="Invalid admin key")
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in SUPPORTED:
         raise HTTPException(status_code=400, detail=f"Supported: {', '.join(sorted(SUPPORTED))}")
+    content = await file.read(settings.max_upload_mb * 1024 * 1024 + 1)
+    if len(content) > settings.max_upload_mb * 1024 * 1024:
+        raise HTTPException(status_code=413, detail=f"Maximum upload size is {settings.max_upload_mb} MB")
+    filename = Path((file.filename or "").replace("\\", "/")).name
+    if not filename or filename in {".", ".."}:
+        raise HTTPException(status_code=400, detail="A valid filename is required")
+    if not content:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty")
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
-    dest = upload_dir / Path(file.filename).name
-    dest.write_bytes(await file.read())
+    dest = upload_dir / filename
+    if dest.exists():
+        raise HTTPException(status_code=409, detail="A file with this name is already uploaded")
+    dest.write_bytes(content)
     docs = load_file(dest)
     chunks = chunk_documents(docs)
     ids = add_documents(chunks)

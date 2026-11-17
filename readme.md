@@ -48,6 +48,8 @@ Build a secure IT Support Copilot that:
 
 ## 2. Why This Is an FDE Project
 
+> **Pilot data boundary:** This repository is a prototype and does not yet authenticate employees or enforce source-document permissions during retrieval. Use fictional or public documents only. Do not upload confidential, personal, legal, HR, or customer information until identity, access controls, retention, and provider data handling have been reviewed and implemented for the target organization.
+
 A Forward Deployed Engineer does more than create an LLM notebook. The FDE must turn the customer's problem into a usable product.
 
 ```text
@@ -279,7 +281,6 @@ Create a `.env` file in the project root directory with the following variables:
 ```env
 # LLM API Keys
 GROQ_API_KEY=your_groq_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
 
 # External Search
 TAVILY_API_KEY=your_tavily_api_key_here
@@ -291,11 +292,11 @@ PINECONE_NAMESPACE=company-it-kb
 
 # LLM Models
 GROQ_MODEL=openai/gpt-oss-20b
-OPENAI_MODEL=gpt-4o-mini
-EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 
 # Security
-ADMIN_API_KEY=change-me-in-production
+ADMIN_API_KEY=replace-with-a-long-random-secret
+MAX_UPLOAD_MB=25
 
 # Application Settings
 APP_ENV=development
@@ -306,15 +307,14 @@ APP_ENV=development
 | Variable | Description | Example | Required |
 |---|---|---|---|
 | `GROQ_API_KEY` | API key for Groq LLM (routing, grading, generation) | `gsk_...` | ✅ Yes |
-| `OPENAI_API_KEY` | API key for OpenAI (embeddings and fallback LLM) | `sk-...` | ✅ Yes |
 | `TAVILY_API_KEY` | API key for Tavily web search | `tvly-...` | ✅ Yes |
 | `PINECONE_API_KEY` | API key for Pinecone vector database | `pckey-...` | ✅ Yes |
 | `PINECONE_INDEX_NAME` | Pinecone index name | `fde-it-support-rag` | ⚠️ Optional (default: `fde-it-support-rag`) |
 | `PINECONE_NAMESPACE` | Pinecone namespace for document isolation | `company-it-kb` | ⚠️ Optional (default: `company-it-kb`) |
 | `GROQ_MODEL` | Groq model identifier | `openai/gpt-oss-20b` | ⚠️ Optional (default: `openai/gpt-oss-20b`) |
-| `OPENAI_MODEL` | OpenAI model identifier | `gpt-4o-mini` | ⚠️ Optional (default: `gpt-4o-mini`) |
-| `EMBEDDING_MODEL` | Embedding model for vectorization | `text-embedding-3-small` | ⚠️ Optional (default: `text-embedding-3-small`) |
-| `ADMIN_API_KEY` | Secret key for admin endpoints (document ingestion) | `your-secure-key` | ⚠️ Optional (default: `change-me`) |
+| `EMBEDDING_MODEL` | Embedding model for vectorization | `sentence-transformers/all-MiniLM-L6-v2` | ⚠️ Optional (default: `sentence-transformers/all-MiniLM-L6-v2`) |
+| `ADMIN_API_KEY` | Secret key for admin endpoints (document ingestion) | `your-secure-key` | Required to enable document upload |
+| `MAX_UPLOAD_MB` | Maximum upload size in megabytes | `25` | ⚠️ Optional (default: `25`, maximum: `500`) |
 | `APP_ENV` | Application environment | `development` or `production` | ⚠️ Optional (default: `development`) |
 
 **⚠️ Important Security Notes:**
@@ -353,13 +353,13 @@ python run.py
 Open:
 
 ```text
-http://127.0.0.1:8000
+http://127.0.0.1:8080
 ```
 
 FastAPI API docs:
 
 ```text
-http://127.0.0.1:8000/docs
+http://127.0.0.1:8080/docs
 ```
 
 ---

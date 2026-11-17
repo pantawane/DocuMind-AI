@@ -75,9 +75,12 @@ def ensure_index():
             current_dimension = index_info.get("dimension")
 
         if current_dimension is not None and current_dimension != desired_dimension:
-            pc.delete_index(name=settings.pinecone_index_name)
-            while settings.pinecone_index_name in [x["name"] for x in pc.list_indexes()]:
-                time.sleep(1)
+            raise RuntimeError(
+                f"Pinecone index '{settings.pinecone_index_name}' has dimension "
+                f"{current_dimension}, but embedding model '{settings.embedding_model}' "
+                f"requires {desired_dimension}. Create a new index and migrate data "
+                "before changing the configured index."
+            )
 
     if settings.pinecone_index_name not in [x["name"] for x in pc.list_indexes()]:
         pc.create_index(

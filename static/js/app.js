@@ -6,9 +6,19 @@ const sourceUsed = document.getElementById('sourceUsed');
 
 function escapeHtml(s=''){return s.replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function formatText(s=''){return escapeHtml(s).replace(/\n/g,'<br>');}
+function safeHttpUrl(value=''){
+  try{const url=new URL(value); return ['http:','https:'].includes(url.protocol)?url.href:'';}catch{return '';}
+}
 function addMessage(role, text, source='', citations=[]){
   const wrap=document.createElement('div'); wrap.className=`message ${role}`;
-  const citeHtml=citations.length?`<div class="citations"><strong>Sources</strong><br>${citations.map(c=>c.url?`<a href="${escapeHtml(c.url)}" target="_blank" rel="noopener">${escapeHtml(c.title)}</a>`:escapeHtml(c.title)).join('<br>')}</div>`:'';
+  const citeHtml=citations.length?`<div class="citations"><strong>Sources</strong>${citations.map(c=>{
+    const url=safeHttpUrl(c.url||'');
+    const label=c.id?`[${escapeHtml(String(c.id))}] `:'';
+    const title=url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${label}${escapeHtml(c.title)}</a>`:`${label}${escapeHtml(c.title)}`;
+    const location=[c.page?`Page ${c.page}`:'',c.section||''].filter(Boolean).join(' · ');
+    const detail=[location?`<span class="citation-location">${escapeHtml(location)}</span>`:'',c.excerpt?`<span class="citation-excerpt">${escapeHtml(c.excerpt)}</span>`:''].join('');
+    return `<div class="citation-item"><div>${title}</div>${detail}</div>`;
+  }).join('')}</div>`:'';
   wrap.innerHTML=`<div class="avatar">AI</div><div class="bubble">${formatText(text)}${source?`<div class="answer-source">Source: ${escapeHtml(source)}</div>`:''}${citeHtml}</div>`;
   chat.appendChild(wrap); chat.scrollTop=chat.scrollHeight;
 }

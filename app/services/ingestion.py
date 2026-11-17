@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from typing import Iterable
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -26,4 +27,20 @@ def load_file(path: Path) -> list[Document]:
 
 def chunk_documents(docs: Iterable[Document]) -> list[Document]:
     splitter = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=120, add_start_index=True)
-    return splitter.split_documents(list(docs))
+    chunks: list[Document] = []
+    for doc in docs:
+        doc_chunks = splitter.split_documents([doc])
+        headings = list(re.finditer(r"^\s{0,3}#{1,6}\s+(.+?)\s*$", doc.page_content, re.MULTILINE))
+
+        # Keep the nearest preceding Markdown heading with each chunk so answers
+        # can point people to a useful section, even when the heading is in the
+        # previous chunk.
+        for chunk in doc_chunks:
+            start_index = chunk.metadata.get("start_index")
+            if start_index is not None:
+                preceding = [heading for heading in headings if heading.start() <= start_index]
+                if preceding:
+                    chunk.metadata["section"] = preceding[-1].group(1).strip()
+        chunks.extend(doc_chunks)
+
+    return chunks
