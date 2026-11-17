@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Literal
 from langchain_groq import ChatGroq
 from langchain_tavily import TavilySearch
@@ -125,20 +126,41 @@ Question: {state['question']}
     }
 
 def generate_from_kb(state: AgentState):
-    context = "\n\n".join(f"[Source: {d.metadata.get('source','unknown')}]\n{d.page_content}" for d in state["kb_docs"])
+    citations = []
+    citation_ids = {}
+    context_parts = []
+    for doc in state["kb_docs"]:
+        source = doc.metadata.get("source", "Private KB")
+        page = doc.metadata.get("page")
+        page_number = page + 1 if isinstance(page, int) else None
+        section = doc.metadata.get("section")
+        key = (source, page_number, section, doc.page_content)
+        if key not in citation_ids:
+            citation_id = len(citations) + 1
+            citation_ids[key] = citation_id
+            citations.append({
+                "id": citation_id,
+                "title": Path(str(source)).name or "Private knowledge base",
+                "url": "",
+                "type": "private_kb",
+                "page": page_number,
+                "section": section,
+                "excerpt": doc.page_content[:320].strip(),
+            })
+
+        location = f" page {page_number}" if page_number is not None else ""
+        location += f", section {section}" if section else ""
+        context_parts.append(
+            f"[Source {citation_ids[key]}: {Path(str(source)).name or 'Private knowledge base'}{location}]\n{doc.page_content}"
+        )
+    context = "\n\n".join(context_parts)
     answer = llm().invoke(f"""
 You are an enterprise IT support copilot. Answer ONLY from the private company KB below.
 Be concise, actionable, and safe. If steps are present, present them clearly.
 Do not invent policy details. Mention that the answer is based on the company's private knowledge base.
+Add a [number] citation after factual claims, using only the source numbers provided below. Do not create or guess source numbers.
 Question: {state['question']}\n\nPrivate KB:\n{context}
 """).content
-    citations = []
-    seen = set()
-    for d in state["kb_docs"]:
-        src = d.metadata.get("source", "Private KB")
-        if src not in seen:
-            seen.add(src)
-            citations.append({"title": src.split("/")[-1], "url": "", "type": "private_kb"})
     return {"answer": answer, "source_used": "private_kb", "citations": citations, "trace": add_trace(state, "Answer generation → PRIVATE KB")}
 
 def generate_from_web(state: AgentState):
